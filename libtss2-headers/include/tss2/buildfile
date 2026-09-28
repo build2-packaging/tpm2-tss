@@ -8,11 +8,21 @@ lib{tss2-headers}: h{**} $intf_libs
 out_pfx = [dir_path] $out_root/include/
 src_pfx = [dir_path] $src_root/include/
 
+# The public headers include each other with the quote form and unqualified
+# names, so the tss2/ directory itself must also be on the consumer's header
+# search path. This matters when the including header comes from a different
+# package.
+#
+out_pfx_unq = [dir_path] $out_root/include/tss2/
+src_pfx_unq = [dir_path] $src_root/include/tss2/
+
 lib{tss2-headers}:
 {
-  c.export.poptions = "-I$out_pfx" "-I$src_pfx"
+  c.export.poptions = "-I$out_pfx" "-I$src_pfx" "-I$out_pfx_unq" "-I$src_pfx_unq"
   c.export.libs = $intf_libs
 }
+
+lib{tss2-headers}: c.pkgconfig.include = include/ include/tss2/
 
 # Install into the tss2/ subdirectory of, say, /usr/include/
 # recreating subdirectories.
