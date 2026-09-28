@@ -1,0 +1,12 @@
+pub_hdrs = h{**}
+
+./: $pub_hdrs
+
+# Install into the tss2/ subdirectory of, say, /usr/include/
+# recreating subdirectories.
+#
+h{*}:
+{
+  install         = include/tss2/
+  install.subdirs = true
+}

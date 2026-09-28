@@ -1,0 +1,3 @@
+import libs = libtss2-mu%lib{tss2-mu}
+
+exe{driver}: {h c}{**} $libs testscript{**}
