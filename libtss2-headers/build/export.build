@@ -1,0 +1,6 @@
+$out_root/
+{
+  include include/tss2/
+}
+
+export $out_root/include/tss2/$import.target

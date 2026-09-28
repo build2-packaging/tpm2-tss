@@ -1,0 +1,7 @@
+project = libtss2-headers
+
+using version
+using config
+using test
+using install
+using dist

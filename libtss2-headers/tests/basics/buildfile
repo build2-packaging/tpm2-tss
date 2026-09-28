@@ -1,0 +1,3 @@
+import libs = libtss2-headers%lib{tss2-headers}
+
+exe{driver}: {h c}{**} $libs testscript{**}

@@ -1,0 +1,24 @@
+intf_libs = # Interface dependencies.
+#import xxxx_libs += libhello%lib{hello}
+
+lib{tss2-headers}: h{**} $intf_libs
+
+# Export options.
+#
+out_pfx = [dir_path] $out_root/include/
+src_pfx = [dir_path] $src_root/include/
+
+lib{tss2-headers}:
+{
+  c.export.poptions = "-I$out_pfx" "-I$src_pfx"
+  c.export.libs = $intf_libs
+}
+
+# Install into the tss2/ subdirectory of, say, /usr/include/
+# recreating subdirectories.
+#
+h{*}:
+{
+  install         = include/tss2/
+  install.subdirs = true
+}
