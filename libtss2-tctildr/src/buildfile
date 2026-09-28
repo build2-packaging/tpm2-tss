@@ -110,6 +110,30 @@ if ($c.target.system == 'mingw32')
 if ($c.target.system == 'mingw32')
   tss2-tcti/obj{tctildr}: c.coptions += -include "$src_base/mingw-strndup.h"
 
+# tctildr.c's strcpy() calls are the standard MSVC opinion that this
+# POSIX/C-standard name is "unsafe" in favor of its own _s-suffixed
+# strcpy_s(); the destination buffers here are already sized to fit.
+# This deprecation comes from the UCRT headers' own
+# __declspec(deprecated(...)) annotation, not a compiler-specific check,
+# so Clang targeting win32-msvc sees it too, under its own generic
+# -Wdeprecated-declarations name rather than a /wd number.
+#
+if ($c.target.system == 'win32-msvc')
+{
+  if ($c.id.type == 'msvc')
+    tss2-tcti/obj{tctildr}: c.coptions += /wd4996
+  elif ($c.id.type == 'clang')
+    tss2-tcti/obj{tctildr}: c.coptions += -Wno-deprecated-declarations
+}
+
+# tctildr-nodl.c's "unknown pragma 'GCC'" is upstream's own
+# #pragma GCC diagnostic push/ignored "-Wtype-limits"/pop, a GCC-specific
+# pragma that real cl.exe doesn't recognize, but that Clang (any mode)
+# understands natively for compatibility, so it never warns here.
+#
+if ($c.id.type == 'msvc')
+  tss2-tcti/obj{tctildr-nodl}: c.coptions += /wd4068
+
 # Export options.
 #
 # The public headers include each other with unqualified names, so consumers
