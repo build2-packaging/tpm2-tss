@@ -1,0 +1,233 @@
+--- esys_iutil.c.orig	2026-09-28 15:57:06 +0200
++++ esys_iutil.c	2026-09-28 15:59:02 +0200
+@@ -573,56 +573,71 @@
+             size_t key_len = TPM2_MAX_SYM_KEY_BYTES + TPM2_MAX_SYM_BLOCK_SIZE;
+             if (key_len % hlen > 0)
+                 key_len = key_len + hlen - (key_len % hlen);
+-            uint8_t        symKey[key_len];
++            uint8_t       *symKey = malloc(key_len);
++            BYTE          *encrypt_buffer = NULL;
+             size_t         paramSize = 0;
+             const uint8_t *paramBuffer;
+ 
++            if (symKey == NULL)
++                return_error(TSS2_ESYS_RC_MEMORY, "Out of memory.");
++
+             r = Tss2_Sys_GetDecryptParam(esys_context->sys, &paramSize, &paramBuffer);
+-            return_if_error(r, "Encryption not possible");
++            goto_if_error(r, "Encryption not possible", encrypt_param_cleanup);
+ 
+             if (paramSize == 0)
+-                continue;
++                goto encrypt_param_cleanup;
+ 
+-            BYTE encrypt_buffer[paramSize];
++            encrypt_buffer = malloc(paramSize);
++            if (encrypt_buffer == NULL) {
++                r = TSS2_ESYS_RC_MEMORY;
++                LOG_ERROR("%s " TPM2_ERROR_FORMAT, "Out of memory.", TPM2_ERROR_TEXT(r));
++                goto encrypt_param_cleanup;
++            }
+             memcpy(&encrypt_buffer[0], paramBuffer, paramSize);
+             LOGBLOB_DEBUG(paramBuffer, paramSize, "param to encrypt");
+ 
+             /* AES encryption with key derived with KDFa */
+             if (symDef->algorithm == TPM2_ALG_AES) {
+                 if (symDef->mode.aes != TPM2_ALG_CFB) {
+-                    return_error(TSS2_ESYS_RC_BAD_VALUE, "Invalid symmetric mode (must be CFB)");
++                    r = TSS2_ESYS_RC_BAD_VALUE;
++                    LOG_ERROR("%s " TPM2_ERROR_FORMAT, "Invalid symmetric mode (must be CFB)",
++                              TPM2_ERROR_TEXT(r));
++                    goto encrypt_param_cleanup;
+                 }
+                 r = iesys_crypto_KDFa(
+                     &esys_context->crypto_backend, rsrc_session->authHash,
+                     &rsrc_session->sessionValue[0], rsrc_session->sizeSessionValue, "CFB",
+                     &rsrc_session->nonceCaller, &rsrc_session->nonceTPM,
+                     symDef->keyBits.aes + AES_BLOCK_SIZE_IN_BYTES * 8, NULL, &symKey[0], FALSE);
+-                return_if_error(r, "while computing KDFa");
++                goto_if_error(r, "while computing KDFa", encrypt_param_cleanup);
+ 
+                 size_t aes_off = (symDef->keyBits.aes + 7) / 8;
+                 r = iesys_crypto_aes_encrypt(&esys_context->crypto_backend, &symKey[0],
+                                              symDef->algorithm, symDef->keyBits.aes,
+                                              symDef->mode.aes, &encrypt_buffer[0], paramSize,
+                                              &symKey[aes_off]);
+-                return_if_error(r, "AES encryption not possible");
++                goto_if_error(r, "AES encryption not possible", encrypt_param_cleanup);
+             } else if (symDef->algorithm == TPM2_ALG_SM4) {
+                 /* SM4 encryption with key derived with KDFa */
+                 if (symDef->mode.sm4 != TPM2_ALG_CFB) {
+-                    return_error(TSS2_ESYS_RC_BAD_VALUE, "Invalid symmetric mode (must be CFB)");
++                    r = TSS2_ESYS_RC_BAD_VALUE;
++                    LOG_ERROR("%s " TPM2_ERROR_FORMAT, "Invalid symmetric mode (must be CFB)",
++                              TPM2_ERROR_TEXT(r));
++                    goto encrypt_param_cleanup;
+                 }
+                 r = iesys_crypto_KDFa(
+                     &esys_context->crypto_backend, rsrc_session->authHash,
+                     &rsrc_session->sessionValue[0], rsrc_session->sizeSessionValue, "CFB",
+                     &rsrc_session->nonceCaller, &rsrc_session->nonceTPM,
+                     symDef->keyBits.sm4 + SM4_BLOCK_SIZE_IN_BYTES * 8, NULL, &symKey[0], FALSE);
+-                return_if_error(r, "while computing KDFa");
++                goto_if_error(r, "while computing KDFa", encrypt_param_cleanup);
+ 
+                 size_t sm4_off = (symDef->keyBits.sm4 + 7) / 8;
+                 r = iesys_crypto_sm4_encrypt(&esys_context->crypto_backend, &symKey[0],
+                                              symDef->algorithm, symDef->keyBits.sm4,
+                                              symDef->mode.sm4, &encrypt_buffer[0], paramSize,
+                                              &symKey[sm4_off]);
+-                return_if_error(r, "SM4 encryption not possible");
++                goto_if_error(r, "SM4 encryption not possible", encrypt_param_cleanup);
+             }
+             /* XOR obfuscation of parameter */
+             else if (symDef->algorithm == TPM2_ALG_XOR) {
+@@ -631,14 +646,23 @@
+                     &rsrc_session->sessionValue[0], rsrc_session->sizeSessionValue,
+                     &rsrc_session->nonceCaller, &rsrc_session->nonceTPM, &encrypt_buffer[0],
+                     paramSize);
+-                return_if_error(r, "XOR obfuscation not possible.");
++                goto_if_error(r, "XOR obfuscation not possible.", encrypt_param_cleanup);
+ 
+             } else {
+-                return_error(TSS2_ESYS_RC_BAD_VALUE,
+-                             "Invalid symmetric algorithm (should be XOR, AES, or SM4)");
++                r = TSS2_ESYS_RC_BAD_VALUE;
++                LOG_ERROR("%s " TPM2_ERROR_FORMAT,
++                          "Invalid symmetric algorithm (should be XOR, AES, or SM4)",
++                          TPM2_ERROR_TEXT(r));
++                goto encrypt_param_cleanup;
+             }
+             r = Tss2_Sys_SetDecryptParam(esys_context->sys, paramSize, &encrypt_buffer[0]);
+-            return_if_error(r, "Set encrypt parameter not possible");
++            goto_if_error(r, "Set encrypt parameter not possible", encrypt_param_cleanup);
++
++encrypt_param_cleanup:
++            free(symKey);
++            free(encrypt_buffer);
++            if (r != TSS2_RC_SUCCESS)
++                return r;
+         }
+     }
+     return r;
+@@ -667,6 +691,8 @@
+     IESYS_SESSION *rsrc_session;
+     TPMT_SYM_DEF  *symDef;
+     size_t         key_len = TPM2_MAX_SYM_KEY_BYTES + TPM2_MAX_SYM_BLOCK_SIZE;
++    uint8_t       *symKey = NULL;
++    UINT8         *plaintext = NULL;
+ 
+     session = esys_context->session_tab[esys_context->encryptNonceIdx];
+     rsrc_session = &session->rsrc.misc.rsrc_session;
+@@ -677,18 +703,28 @@
+     if (key_len % hlen > 0)
+         key_len = key_len + hlen - (key_len % hlen);
+ 
+-    uint8_t symKey[key_len];
++    symKey = malloc(key_len);
++    if (symKey == NULL)
++        return_error(TSS2_ESYS_RC_MEMORY, "Out of memory.");
+ 
+     r = Tss2_Sys_GetEncryptParam(esys_context->sys, &p2BSize, &ciphertext);
+-    return_if_error(r, "Getting encrypt param");
++    goto_if_error(r, "Getting encrypt param", decrypt_param_cleanup);
+ 
+-    UINT8 plaintext[p2BSize];
++    plaintext = malloc(p2BSize);
++    if (plaintext == NULL) {
++        r = TSS2_ESYS_RC_MEMORY;
++        LOG_ERROR("%s " TPM2_ERROR_FORMAT, "Out of memory.", TPM2_ERROR_TEXT(r));
++        goto decrypt_param_cleanup;
++    }
+     memcpy(&plaintext[0], ciphertext, p2BSize);
+ 
+     if (symDef->algorithm == TPM2_ALG_AES) {
+         /* Parameter decryption with a symmetric AES key derived by KDFa */
+         if (symDef->mode.aes != TPM2_ALG_CFB) {
+-            return_error(TSS2_ESYS_RC_BAD_VALUE, "Invalid symmetric mode (must be CFB)");
++            r = TSS2_ESYS_RC_BAD_VALUE;
++            LOG_ERROR("%s " TPM2_ERROR_FORMAT, "Invalid symmetric mode (must be CFB)",
++                      TPM2_ERROR_TEXT(r));
++            goto decrypt_param_cleanup;
+         }
+         LOGBLOB_DEBUG(&rsrc_session->sessionKey.buffer[0], rsrc_session->sessionKey.size,
+                       "IESYS encrypt session key");
+@@ -698,7 +734,7 @@
+                               &rsrc_session->nonceTPM, &rsrc_session->nonceCaller,
+                               symDef->keyBits.aes + AES_BLOCK_SIZE_IN_BYTES * 8, NULL, &symKey[0],
+                               FALSE);
+-        return_if_error(r, "KDFa error");
++        goto_if_error(r, "KDFa error", decrypt_param_cleanup);
+         LOGBLOB_DEBUG(&symKey[0], ((symDef->keyBits.aes + AES_BLOCK_SIZE_IN_BYTES * 8) + 7) / 8,
+                       "IESYS encrypt KDFa key");
+ 
+@@ -706,14 +742,17 @@
+         r = iesys_crypto_aes_decrypt(&esys_context->crypto_backend, &symKey[0], symDef->algorithm,
+                                      symDef->keyBits.aes, symDef->mode.aes, &plaintext[0], p2BSize,
+                                      &symKey[aes_off]);
+-        return_if_error(r, "Decryption error");
++        goto_if_error(r, "Decryption error", decrypt_param_cleanup);
+ 
+         r = Tss2_Sys_SetEncryptParam(esys_context->sys, p2BSize, &plaintext[0]);
+-        return_if_error(r, "Setting plaintext");
++        goto_if_error(r, "Setting plaintext", decrypt_param_cleanup);
+     } else if (symDef->algorithm == TPM2_ALG_SM4) {
+         /* Parameter decryption with a symmetric SM4 key derived by KDFa */
+         if (symDef->mode.sm4 != TPM2_ALG_CFB) {
+-            return_error(TSS2_ESYS_RC_BAD_VALUE, "Invalid symmetric mode (must be CFB)");
++            r = TSS2_ESYS_RC_BAD_VALUE;
++            LOG_ERROR("%s " TPM2_ERROR_FORMAT, "Invalid symmetric mode (must be CFB)",
++                      TPM2_ERROR_TEXT(r));
++            goto decrypt_param_cleanup;
+         }
+         LOGBLOB_DEBUG(&rsrc_session->sessionKey.buffer[0], rsrc_session->sessionKey.size,
+                       "IESYS encrypt session key");
+@@ -723,7 +762,7 @@
+                               &rsrc_session->nonceTPM, &rsrc_session->nonceCaller,
+                               symDef->keyBits.sm4 + SM4_BLOCK_SIZE_IN_BYTES * 8, NULL, &symKey[0],
+                               FALSE);
+-        return_if_error(r, "KDFa error");
++        goto_if_error(r, "KDFa error", decrypt_param_cleanup);
+         LOGBLOB_DEBUG(&symKey[0], ((symDef->keyBits.sm4 + SM4_BLOCK_SIZE_IN_BYTES * 8) + 7) / 8,
+                       "IESYS encrypt KDFa key");
+ 
+@@ -731,25 +770,32 @@
+         r = iesys_crypto_sm4_decrypt(&esys_context->crypto_backend, &symKey[0], symDef->algorithm,
+                                      symDef->keyBits.sm4, symDef->mode.sm4, &plaintext[0], p2BSize,
+                                      &symKey[sm4_off]);
+-        return_if_error(r, "Decryption error");
++        goto_if_error(r, "Decryption error", decrypt_param_cleanup);
+ 
+         r = Tss2_Sys_SetEncryptParam(esys_context->sys, p2BSize, &plaintext[0]);
+-        return_if_error(r, "Setting plaintext");
++        goto_if_error(r, "Setting plaintext", decrypt_param_cleanup);
+     } else if (symDef->algorithm == TPM2_ALG_XOR) {
+         /* Parameter decryption with XOR obfuscation */
+         r = iesys_xor_parameter_obfuscation(&esys_context->crypto_backend, rsrc_session->authHash,
+                                             &rsrc_session->sessionValue[0],
+                                             rsrc_session->sizeSessionValue, &rsrc_session->nonceTPM,
+                                             &rsrc_session->nonceCaller, &plaintext[0], p2BSize);
+-        return_if_error(r, "XOR obfuscation not possible.");
++        goto_if_error(r, "XOR obfuscation not possible.", decrypt_param_cleanup);
+ 
+         r = Tss2_Sys_SetEncryptParam(esys_context->sys, p2BSize, &plaintext[0]);
+-        return_if_error(r, "Setting plaintext");
++        goto_if_error(r, "Setting plaintext", decrypt_param_cleanup);
+     } else {
+-        return_error(TSS2_ESYS_RC_BAD_VALUE,
+-                     "Invalid symmetric algorithm (should be XOR, AES, or SM4)");
++        r = TSS2_ESYS_RC_BAD_VALUE;
++        LOG_ERROR("%s " TPM2_ERROR_FORMAT,
++                  "Invalid symmetric algorithm (should be XOR, AES, or SM4)",
++                  TPM2_ERROR_TEXT(r));
++        goto decrypt_param_cleanup;
+     }
+-    return TSS2_RC_SUCCESS;
++
++decrypt_param_cleanup:
++    free(symKey);
++    free(plaintext);
++    return r;
+ }
+ 
+ /** Computation of the command response(cp) hash.
