@@ -1,0 +1,3 @@
+import libs = libtss2-tcti-pcap%lib{tss2-tcti-pcap}
+
+exe{driver}: {h c}{**} $libs testscript{**}
