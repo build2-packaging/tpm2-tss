@@ -1,0 +1,15 @@
+--- tctildr-nodl.c.orig	2026-09-26 17:08:06 +0200
++++ tctildr-nodl.c	2026-09-26 22:59:01 +0200
+@@ -39,8 +39,12 @@
+ #include "tctildr.h"         // for tcti_from_init
+ #include "tss2_common.h"     // for TSS2_RC, TSS2_RC_SUCCESS, TSS2_TCTI_RC...
+ #include "tss2_tcti.h"       // for TSS2_TCTI_CONTEXT, TSS2_TCTI_INFO, TSS...
++#ifdef TCTI_MSSIM
+ #include "tss2_tcti_mssim.h" // for Tss2_Tcti_Mssim_Init
++#endif /* TCTI_MSSIM */
++#ifdef TCTI_SWTPM
+ #include "tss2_tcti_swtpm.h" // for Tss2_Tcti_Swtpm_Init
++#endif /* TCTI_SWTPM */
+ #include "util/aux_util.h"   // for UNUSED
+ #ifdef _WIN32
+ #include "tss2_tcti_tbs.h"
