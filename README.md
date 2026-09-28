@@ -10,6 +10,7 @@ appropriate for development rather than consumption. If you want to use
 
 * [`libtss2-headers`](libtss2-headers/PACKAGE-README.md)
 * [`libtss2-mu`](libtss2-mu/PACKAGE-README.md)
+* [`libtss2-rc`](libtss2-rc/PACKAGE-README.md)
 
 The development setup for `tpm2-tss` uses the standard `bdep`-based workflow.
 For example:
