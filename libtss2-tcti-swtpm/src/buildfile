@@ -72,6 +72,29 @@ if ($c.id.type == 'clang')
 if ($c.target.system == 'win32-msvc')
   util/obj{key-value-parse}: c.poptions += -Dstrtok_r=strtok_s
 
+# util-io/io.c assigns sizes already bounded well under 64K into a
+# narrower int, which MSVC's cl.exe flags at its default warning level;
+# GCC/Clang do not warn on this by default. tcti-swtpm.c's sscanf()/
+# strdup() calls are the standard MSVC opinion that these POSIX/C-standard
+# names are "unsafe" in favor of its own _s-suffixed variants; both calls
+# here are already bounded (a fixed-format sscanf(), a strdup() of a
+# NUL-terminated string), so there is nothing to actually fix. Unlike the
+# narrowing warning above, the deprecation one comes from the UCRT
+# headers' own __declspec(deprecated(...)) annotation, not a compiler-
+# specific check, so Clang targeting win32-msvc sees it too: just
+# under its own generic -Wdeprecated-declarations name, not a /wd number.
+#
+if ($c.id.type == 'msvc')
+  util-io/obj{io}: c.coptions += /wd4267
+
+if ($c.target.system == 'win32-msvc')
+{
+  if ($c.id.type == 'msvc')
+    tss2-tcti/obj{tcti-swtpm}: c.coptions += /wd4996
+  elif ($c.id.type == 'clang')
+    tss2-tcti/obj{tcti-swtpm}: c.coptions += -Wno-deprecated-declarations
+}
+
 if ($c.target.system == 'mingw32')
   c.loptions += -Wl,--export-all-symbols
 
