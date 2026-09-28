@@ -33,3 +33,6 @@ location: libtss2-tctildr/
 
 :
 location: libtss2-tcti-pcap/
+
+:
+location: libtss2-tcti-null/
