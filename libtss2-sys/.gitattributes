@@ -1,0 +1,2 @@
+src/tss2-sys symlink=dir
+src/util symlink=dir
