@@ -24,3 +24,6 @@ location: libtss2-tcti-cmd/
 
 :
 location: libtss2-tcti-libtpms/
+
+:
+location: libtss2-tcti-tbs/
