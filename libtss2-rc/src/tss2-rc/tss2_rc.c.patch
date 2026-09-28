@@ -1,0 +1,60 @@
+--- tss2_rc.c.orig	2026-09-21 18:43:38
++++ tss2_rc.c	2026-09-22 03:26:11
+@@ -15,6 +15,12 @@
+ #include "tss2_rc.h"         // for TSS2_RC_INFO, TSS2_RC_HANDLER, Tss2_RC_...
+ #include "tss2_tpm2_types.h" // for TPM2_RC, TPM2_RC_FMT1, TPM2_RC_VER1
+ #include "util/aux_util.h"   // for ARRAY_LEN, COMPILER_ATTR
++
++#if defined(_MSC_VER)
++#define TSS2_TLS __declspec(thread)
++#else
++#define TSS2_TLS __thread
++#endif
+ 
+ /**
+  * The maximum size of a layer name.
+@@ -602,7 +608,7 @@
+ 
+ static const char *
+ tpm2_err_handler_fmt1(TPM2_RC rc) {
+-    static __thread char buf[TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
++    static TSS2_TLS char buf[TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
+ 
+     clearbuf(buf);
+ 
+@@ -640,7 +646,7 @@
+ 
+ static const char *
+ tpm2_err_handler_fmt0(TSS2_RC rc) {
+-    static __thread char buf[TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
++    static TSS2_TLS char buf[TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
+ 
+     clearbuf(buf);
+ 
+@@ -866,7 +872,7 @@
+  */
+ static const char *
+ unknown_layer_handler(TSS2_RC rc) {
+-    static __thread char buf[32];
++    static TSS2_TLS char buf[32];
+ 
+     clearbuf(buf);
+     catbuf(buf, "0x%" PRIX32, rc);
+@@ -950,7 +956,7 @@
+  */
+ const char *
+ Tss2_RC_Decode(TSS2_RC rc) {
+-    static __thread char buf[TSS2_ERR_LAYER_NAME_MAX + TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
++    static TSS2_TLS char buf[TSS2_ERR_LAYER_NAME_MAX + TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
+ 
+     clearbuf(buf);
+ 
+@@ -1041,7 +1047,7 @@
+  */
+ const char *
+ Tss2_RC_DecodeInfoError(TSS2_RC_INFO *info) {
+-    static __thread char buf[TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
++    static TSS2_TLS char buf[TSS2_ERR_LAYER_ERROR_STR_MAX + 1];
+     const char          *m = NULL;
+ 
+     if (!info) {
