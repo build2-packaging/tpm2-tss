@@ -1,4 +1,12 @@
-./: {*/ -build/} doc{README.md PACKAGE-README.md CHANGELOG.md} legal{LICENSE} manifest
+./: {*/ -build/ -src/ -tests/} doc{README.md PACKAGE-README.md CHANGELOG.md} legal{LICENSE} manifest
+
+# Only Windows is supported (see manifest); this package wraps the
+# Windows-only TBS (TPM Base Services) API.
+#
+supported = ($c.target.class == 'windows')
+
+./: src/:   include = $supported
+./: tests/: include = $supported
 
 # Don't install tests.
 #
