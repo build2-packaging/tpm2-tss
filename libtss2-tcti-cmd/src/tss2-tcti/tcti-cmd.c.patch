@@ -1,0 +1,27 @@
+--- tcti-cmd.c.orig	2026-09-21 18:43:38
++++ tcti-cmd.c	2026-09-23 11:34:13
+@@ -19,7 +19,7 @@
+ 
+ #if defined(__FreeBSD__)
+ #include <sys/procctl.h>
+-#else
++#elif !defined(__APPLE__)
+ #include <sys/prctl.h> // for prctl, PR_SET_PDEATHSIG
+ #endif
+ #include <sys/wait.h> // for waitpid, WNOHANG
+@@ -182,6 +182,15 @@
+     const int sig = SIGTERM;
+     return procctl(P_PID, 0, PROC_PDEATHSIG_CTL, (void *)&sig);
+ }
++#elif defined(__APPLE__)
++static int
++set_exit_with_parent(void) {
++    /* macOS has no prctl()/procctl() equivalent for requesting a
++     * parent-death signal. The subprocess is not auto-terminated if the
++     * parent dies unexpectedly; normal shutdown still reaps/closes it via
++     * tcti_cmd_finalize(). */
++    return 0;
++}
+ #else
+ static int
+ set_exit_with_parent(void) {
