@@ -14,6 +14,7 @@ appropriate for development rather than consumption. If you want to use
 * [`libtss2-sys`](libtss2-sys/PACKAGE-README.md)
 * [`libtss2-tcti-device`](libtss2-tcti-device/PACKAGE-README.md)
 * [`libtss2-tcti-mssim`](libtss2-tcti-mssim/PACKAGE-README.md)
+* [`libtss2-tcti-swtpm`](libtss2-tcti-swtpm/PACKAGE-README.md)
 
 The development setup for `tpm2-tss` uses the standard `bdep`-based workflow.
 For example:
