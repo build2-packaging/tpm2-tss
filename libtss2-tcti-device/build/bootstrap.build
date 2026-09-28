@@ -1,0 +1,7 @@
+project = libtss2-tcti-device
+
+using version
+using config
+using test
+using install
+using dist

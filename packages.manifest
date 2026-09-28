@@ -9,3 +9,6 @@ location: libtss2-rc/
 
 :
 location: libtss2-sys/
+
+:
+location: libtss2-tcti-device/
