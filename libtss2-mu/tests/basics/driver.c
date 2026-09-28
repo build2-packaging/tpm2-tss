@@ -1,73 +1,43 @@
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
+#include <stddef.h>
+#include <stdint.h>
 
-#include <tss2/tss2-mu.h>
+#include <tss2/tss2_common.h>
+#include <tss2/tss2_mu.h>
 
 #undef NDEBUG
 #include <assert.h>
 
-#ifdef _WIN32
-#define tmpfile mytmpfile
-static FILE *mytmpfile ();
-#endif
-
-int main ()
+int main (void)
 {
-  char b[256];
+  uint8_t b[8] = {0};
 
-  /* Basics.
+  /* Marshal is big-endian.
    */
   {
-    FILE *o = tmpfile ();
-    assert (say_hello (o, "World") > 0);
-    rewind (o);
-    assert (fread (b, 1, sizeof (b), o) == 14 &&
-            strncmp (b, "Hello, World!\n", 14) == 0);
-    fclose (o);
+    size_t o = 0;
+    assert (Tss2_MU_UINT32_Marshal (0x01020304, b, sizeof (b), &o) ==
+            TSS2_RC_SUCCESS);
+    assert (o == 4);
+    assert (b[0] == 0x01 && b[1] == 0x02 && b[2] == 0x03 && b[3] == 0x04);
   }
 
-  /* Empty name.
+  /* Round trip.
    */
   {
-    FILE *o = tmpfile ();
-    assert (say_hello (o, "") < 0 && errno == EINVAL);
-    fclose (o);
+    size_t o = 0;
+    UINT32 v = 0;
+    assert (Tss2_MU_UINT32_Unmarshal (b, sizeof (b), &o, &v) ==
+            TSS2_RC_SUCCESS);
+    assert (o == 4 && v == 0x01020304);
+  }
+
+  /* Insufficient buffer.
+   */
+  {
+    size_t o = 0;
+    assert (Tss2_MU_UINT32_Marshal (1, b, 2, &o) ==
+            TSS2_MU_RC_INSUFFICIENT_BUFFER);
   }
 
   return 0;
 }
-
-#ifdef _WIN32
-#include <windows.h>
-#include <fcntl.h>
-#include <io.h>
-
-FILE *mytmpfile ()
-{
-  char d[MAX_PATH + 1], p[MAX_PATH + 1];
-  if (GetTempPathA (sizeof (d), d) == 0 ||
-      GetTempFileNameA (d, "tmp", 0, p) == 0)
-    return NULL;
-
-  HANDLE h = CreateFileA (p,
-                          GENERIC_READ | GENERIC_WRITE,
-                          0,
-                          NULL,
-                          CREATE_ALWAYS,
-                          FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
-                          NULL);
-  if (h == INVALID_HANDLE_VALUE)
-    return NULL;
-
-  int fd = _open_osfhandle ((intptr_t) h, _O_RDWR);
-  if (fd == -1)
-    return NULL;
-
-  FILE *f = _fdopen (fd, "wb+");
-  if (f == NULL)
-    _close (fd);
-
-  return f;
-}
-#endif
