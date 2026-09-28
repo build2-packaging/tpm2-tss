@@ -12,6 +12,7 @@ appropriate for development rather than consumption. If you want to use
 * [`libtss2-mu`](libtss2-mu/PACKAGE-README.md)
 * [`libtss2-rc`](libtss2-rc/PACKAGE-README.md)
 * [`libtss2-sys`](libtss2-sys/PACKAGE-README.md)
+* [`libtss2-tcti-cmd`](libtss2-tcti-cmd/PACKAGE-README.md)
 * [`libtss2-tcti-device`](libtss2-tcti-device/PACKAGE-README.md)
 * [`libtss2-tcti-mssim`](libtss2-tcti-mssim/PACKAGE-README.md)
 * [`libtss2-tcti-swtpm`](libtss2-tcti-swtpm/PACKAGE-README.md)
