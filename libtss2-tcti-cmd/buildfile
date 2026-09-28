@@ -1,4 +1,13 @@
-./: {*/ -build/} doc{README.md PACKAGE-README.md CHANGELOG.md} legal{LICENSE} manifest
+./: {*/ -build/ -src/ -tests/} doc{README.md PACKAGE-README.md CHANGELOG.md} legal{LICENSE} manifest
+
+# Only Linux, FreeBSD, and macOS are supported (see manifest); tcti-cmd.c
+# unconditionally #includes <poll.h>, which no Windows toolchain here
+# provides.
+#
+supported = ($c.target.class == 'linux' || $c.target.class == 'bsd' || $c.target.class == 'macos')
+
+./: src/:   include = $supported
+./: tests/: include = $supported
 
 # Don't install tests.
 #
