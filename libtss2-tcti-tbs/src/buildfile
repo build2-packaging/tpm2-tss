@@ -64,6 +64,13 @@ if ($c.id.type == 'clang')
 if ($c.target.system == 'win32-msvc')
   util/obj{key-value-parse}: c.poptions += -Dstrtok_r=strtok_s
 
+# tcti-tbs.c assigns sizes already bounded well under 64K into a narrower
+# int/UINT32, which MSVC's cl.exe flags at its default warning level;
+# GCC/Clang do not warn on this by default.
+#
+if ($c.id.type == 'msvc')
+  tss2-tcti/obj{tcti-tbs}: c.coptions += /wd4267
+
 if ($c.target.system == 'mingw32')
   c.loptions += -Wl,--export-all-symbols
 
