@@ -1,0 +1,48 @@
+# Man pages.
+#
+in.symbol = '@'
+in.mode = lax
+
+man_version = "$version.major.$version.minor.$version.patch"
+
+# Upstream's own COLOPHON @VERSION@ substitution. The page bodies below
+# carry no substitution markers of their own.
+#
+file{postlude}: in{man-postlude.troff}
+{
+  VERSION = $man_version
+}
+
+# Shared recipe for every man page in this package.
+#
+man{~'/(.*)/'}: file{^'%\1.in%'} file{postlude}
+{{
+  diag man ($>)
+  cat $path($<[0]) $path($<[1]) >$path($>)
+}}
+
+man{tss2-tctildr.7}: install = man/man7/
+man{tss2-tctildr.7}: file{tss2-tctildr.7.in} file{postlude}
+./: man{tss2-tctildr.7}
+
+for p: Tss2_TctiLdr_Initialize Tss2_TctiLdr_Finalize \
+       Tss2_TctiLdr_FreeInfo Tss2_TctiLdr_GetInfo
+{
+  man{$(p).3}: install = man/man3/
+  man{$(p).3}: file{$(p).3.in} file{postlude}
+  ./: man{$(p).3}
+}
+
+# Upstream installs this as a symlink to Tss2_TctiLdr_Initialize.3 (that
+# page already documents both functions in one page). Its own recipe,
+# not the shared pattern rule above, since its prerequisite name does
+# not match its own target name (the pattern's substitution would
+# otherwise also demand a nonexistent Tss2_TctiLdr_Initialize_Ex.3.in).
+#
+man{Tss2_TctiLdr_Initialize_Ex.3}: install = man/man3/
+man{Tss2_TctiLdr_Initialize_Ex.3}: file{Tss2_TctiLdr_Initialize.3.in} file{postlude}
+{{
+  diag man ($>)
+  cat $path($<[0]) $path($<[1]) >$path($>)
+}}
+./: man{Tss2_TctiLdr_Initialize_Ex.3}
