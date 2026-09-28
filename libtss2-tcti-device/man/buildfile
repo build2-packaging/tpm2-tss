@@ -1,0 +1,33 @@
+# Man pages.
+#
+in.symbol = '@'
+in.mode = lax
+
+man_version = "$version.major.$version.minor.$version.patch"
+
+# Upstream's own COLOPHON @VERSION@ substitution. The page bodies below
+# carry no substitution markers of their own.
+#
+file{postlude}: in{man-postlude.troff}
+{
+  VERSION = $man_version
+}
+
+# Shared recipe for every man page in this package.
+#
+man{~'/(.*)/'}: file{^'%\1.in%'} file{postlude}
+{{
+  diag man ($>)
+  cat $path($<[0]) $path($<[1]) >$path($>)
+}}
+
+man{tss2-tcti-device.7}: install = man/man7/
+man{tss2-tcti-device.7}: file{tss2-tcti-device.7.in} file{postlude}
+./: man{tss2-tcti-device.7}
+
+for p: Tss2_Tcti_Device_Init
+{
+  man{$(p).3}: install = man/man3/
+  man{$(p).3}: file{$(p).3.in} file{postlude}
+  ./: man{$(p).3}
+}
