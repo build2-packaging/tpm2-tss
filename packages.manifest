@@ -3,3 +3,6 @@ location: libtss2-headers/
 
 :
 location: libtss2-mu/
+
+:
+location: libtss2-rc/
