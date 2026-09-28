@@ -36,3 +36,6 @@ location: libtss2-tcti-pcap/
 
 :
 location: libtss2-tcti-null/
+
+:
+location: libtss2-esys/
