@@ -50,6 +50,20 @@ if ($c.id.type == 'clang')
   c.coptions += -Wno-variadic-macro-arguments-omitted \
                 -Wno-unknown-warning-option
 
+# These functions assign sizes that are already bounded well under 64K
+# (TPM command/response buffer lengths, handle counts) into narrower
+# UINT16/UINT32/uint16_t/uint32_t fields, which MSVC's cl.exe flags at its
+# default warning level; GCC/Clang do not warn on this by default, and
+# upstream has never had to care. api/ is one file per TPM command, all
+# following the same marshaling pattern, so scope by directory rather
+# than enumerating the specific files this was observed on.
+#
+if ($c.id.type == 'msvc')
+{
+  tss2-sys/api/obj{*}:       c.coptions += /wd4267 /wd4244
+  tss2-sys/obj{sysapi_util}: c.coptions += /wd4267
+}
+
 if ($c.target.system == 'mingw32')
   c.loptions += -Wl,--export-all-symbols
 
