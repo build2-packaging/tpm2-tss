@@ -1,0 +1,21 @@
+/* Internal autoconf probe, never installed or included by any source file.
+ * Drives the compat/ include path decision in ../buildfile via c.predefs
+ * (see HOWTO/third-party-private-headers.md, "Capability detection as -D
+ * flags", in the build2 skill docs) instead of a filesystem/compiler probe,
+ * so the answer comes from the same static, reproducible, cross-compilation
+ * -safe platform checks as every other builtin autoconf check.
+ *
+ * The have-headers-dep.h include is required, not incidental: with zero
+ * #includes, this file has only one dependency (itself), and this Clang's
+ * -MD/-MF output collapses to a single line ("^: have-headers.h", no
+ * trailing backslash) in that case, which build2's c.predefs dependency
+ * parser cannot read ("unexpected output line"). A trivial local header
+ * forces a second (multi-line) dependency without dragging in a system
+ * header's own large, unpredictable macro closure (which independently
+ * confused the same parser when this used <stdio.h>).
+ */
+#include "have-headers-dep.h"
+
+#undef HAVE_NETINET_IN_H
+#undef HAVE_UNISTD_H
+#undef HAVE_SYS_MMAN_H

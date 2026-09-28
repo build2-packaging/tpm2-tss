@@ -3,6 +3,7 @@
 #c.internal.scope = current
 
 using c
+using c.predefs
 
 h{*}: extension = h
 c{*}: extension = c
