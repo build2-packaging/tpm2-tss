@@ -1,73 +1,87 @@
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
+#include <stddef.h>
+#include <stdint.h>
 
-#include <tss2/tss2-esys.h>
+#include <tss2/tss2_common.h>
+#include <tss2/tss2_esys.h>
+#include <tss2/tss2_sys.h>
+#include <tss2/tss2_tcti.h>
 
 #undef NDEBUG
 #include <assert.h>
 
-#ifdef _WIN32
-#define tmpfile mytmpfile
-static FILE *mytmpfile ();
-#endif
-
-int main ()
+/* A TCTI that is never asked to talk to a TPM, just enough to build an ESYS
+ * context on top of.
+ */
+static TSS2_RC
+transmit (TSS2_TCTI_CONTEXT* c, size_t n, const uint8_t* b)
 {
-  char b[256];
+  (void) c; (void) n; (void) b;
+  return TSS2_TCTI_RC_NOT_IMPLEMENTED;
+}
 
-  /* Basics.
-   */
-  {
-    FILE *o = tmpfile ();
-    assert (say_hello (o, "World") > 0);
-    rewind (o);
-    assert (fread (b, 1, sizeof (b), o) == 14 &&
-            strncmp (b, "Hello, World!\n", 14) == 0);
-    fclose (o);
-  }
+static TSS2_RC
+receive (TSS2_TCTI_CONTEXT* c, size_t* n, uint8_t* r, int32_t t)
+{
+  (void) c; (void) n; (void) r; (void) t;
+  return TSS2_TCTI_RC_NOT_IMPLEMENTED;
+}
 
-  /* Empty name.
+static void
+finalize (TSS2_TCTI_CONTEXT* c)
+{
+  (void) c;
+}
+
+static TSS2_RC
+cancel (TSS2_TCTI_CONTEXT* c)
+{
+  (void) c;
+  return TSS2_TCTI_RC_NOT_IMPLEMENTED;
+}
+
+static TSS2_RC
+get_poll_handles (TSS2_TCTI_CONTEXT* c, TSS2_TCTI_POLL_HANDLE* h, size_t* n)
+{
+  (void) c; (void) h; (void) n;
+  return TSS2_TCTI_RC_NOT_IMPLEMENTED;
+}
+
+static TSS2_RC
+set_locality (TSS2_TCTI_CONTEXT* c, uint8_t l)
+{
+  (void) c; (void) l;
+  return TSS2_TCTI_RC_NOT_IMPLEMENTED;
+}
+
+int main (void)
+{
+  TSS2_TCTI_CONTEXT_COMMON_V1 tcti = {
+    .magic = 0x1,
+    .version = 1,
+    .transmit = transmit,
+    .receive = receive,
+    .finalize = finalize,
+    .cancel = cancel,
+    .getPollHandles = get_poll_handles,
+    .setLocality = set_locality};
+
+  ESYS_CONTEXT* e = NULL;
+  assert (Esys_Initialize (&e, (TSS2_TCTI_CONTEXT*) &tcti, NULL) ==
+          TSS2_RC_SUCCESS);
+  assert (e != NULL);
+
+  /* The ESYS context sits on top of a SYS context and the TCTI we gave it.
    */
-  {
-    FILE *o = tmpfile ();
-    assert (say_hello (o, "") < 0 && errno == EINVAL);
-    fclose (o);
-  }
+  TSS2_SYS_CONTEXT* s = NULL;
+  assert (Esys_GetSysContext (e, &s) == TSS2_RC_SUCCESS);
+  assert (s != NULL);
+
+  TSS2_TCTI_CONTEXT* t = NULL;
+  assert (Esys_GetTcti (e, &t) == TSS2_RC_SUCCESS);
+  assert (t == (TSS2_TCTI_CONTEXT*) &tcti);
+
+  Esys_Finalize (&e);
+  assert (e == NULL);
 
   return 0;
 }
-
-#ifdef _WIN32
-#include <windows.h>
-#include <fcntl.h>
-#include <io.h>
-
-FILE *mytmpfile ()
-{
-  char d[MAX_PATH + 1], p[MAX_PATH + 1];
-  if (GetTempPathA (sizeof (d), d) == 0 ||
-      GetTempFileNameA (d, "tmp", 0, p) == 0)
-    return NULL;
-
-  HANDLE h = CreateFileA (p,
-                          GENERIC_READ | GENERIC_WRITE,
-                          0,
-                          NULL,
-                          CREATE_ALWAYS,
-                          FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
-                          NULL);
-  if (h == INVALID_HANDLE_VALUE)
-    return NULL;
-
-  int fd = _open_osfhandle ((intptr_t) h, _O_RDWR);
-  if (fd == -1)
-    return NULL;
-
-  FILE *f = _fdopen (fd, "wb+");
-  if (f == NULL)
-    _close (fd);
-
-  return f;
-}
-#endif
