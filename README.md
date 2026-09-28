@@ -9,6 +9,7 @@ appropriate for development rather than consumption. If you want to use
 `PACKAGE-README.md` file of the package you are interested in:
 
 * [`libtss2-headers`](libtss2-headers/PACKAGE-README.md)
+* [`libtss2-mu`](libtss2-mu/PACKAGE-README.md)
 
 The development setup for `tpm2-tss` uses the standard `bdep`-based workflow.
 For example:
