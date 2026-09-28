@@ -1,0 +1,2 @@
+src/util symlink=dir
+src/tss2-esys/api symlink=dir
