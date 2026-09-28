@@ -1,73 +1,42 @@
-#include <stdio.h>
-#include <errno.h>
+#include <stddef.h>
 #include <string.h>
 
-#include <tss2/tss2-tcti-mssim.h>
+#include <tss2/tss2_common.h>
+#include <tss2/tss2_tcti.h>
+#include <tss2/tss2_tcti_mssim.h>
 
 #undef NDEBUG
 #include <assert.h>
 
-#ifdef _WIN32
-#define tmpfile mytmpfile
-static FILE *mytmpfile ();
-#endif
+/* Exported for symbol lookup, there is no header declaration.
+ */
+const TSS2_TCTI_INFO* Tss2_Tcti_Info (void);
 
-int main ()
+int main (void)
 {
-  char b[256];
-
-  /* Basics.
+  /* Querying the context size needs neither a context nor a TPM.
    */
-  {
-    FILE *o = tmpfile ();
-    assert (say_hello (o, "World") > 0);
-    rewind (o);
-    assert (fread (b, 1, sizeof (b), o) == 14 &&
-            strncmp (b, "Hello, World!\n", 14) == 0);
-    fclose (o);
-  }
+  size_t n = 0;
+  assert (Tss2_Tcti_Mssim_Init (NULL, &n, NULL) == TSS2_RC_SUCCESS);
+  assert (n > 0);
 
-  /* Empty name.
+  /* Exercise the exported info's init function pointer directly rather
+   * than comparing it for equality with Tss2_Tcti_Mssim_Init: a
+   * DLL-imported function's address as seen by the consumer is not
+   * guaranteed to equal its address inside the DLL on Windows (MSVC's
+   * own C4232 warns about exactly this), even though both refer to the
+   * same function, so pointer identity across a shared-library
+   * boundary is not portable. Calling through it and checking it
+   * behaves like the same initializer works uniformly on every
+   * platform and on both the static and shared variant.
    */
-  {
-    FILE *o = tmpfile ();
-    assert (say_hello (o, "") < 0 && errno == EINVAL);
-    fclose (o);
-  }
+  const TSS2_TCTI_INFO* i = Tss2_Tcti_Info ();
+  assert (i != NULL);
+  assert (i->name != NULL && strlen (i->name) > 0);
+
+  size_t n2 = 0;
+  assert (i->init (NULL, &n2, NULL) == TSS2_RC_SUCCESS);
+  assert (n2 == n);
 
   return 0;
 }
-
-#ifdef _WIN32
-#include <windows.h>
-#include <fcntl.h>
-#include <io.h>
-
-FILE *mytmpfile ()
-{
-  char d[MAX_PATH + 1], p[MAX_PATH + 1];
-  if (GetTempPathA (sizeof (d), d) == 0 ||
-      GetTempFileNameA (d, "tmp", 0, p) == 0)
-    return NULL;
-
-  HANDLE h = CreateFileA (p,
-                          GENERIC_READ | GENERIC_WRITE,
-                          0,
-                          NULL,
-                          CREATE_ALWAYS,
-                          FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
-                          NULL);
-  if (h == INVALID_HANDLE_VALUE)
-    return NULL;
-
-  int fd = _open_osfhandle ((intptr_t) h, _O_RDWR);
-  if (fd == -1)
-    return NULL;
-
-  FILE *f = _fdopen (fd, "wb+");
-  if (f == NULL)
-    _close (fd);
-
-  return f;
-}
-#endif
