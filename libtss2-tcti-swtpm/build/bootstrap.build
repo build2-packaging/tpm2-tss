@@ -1,0 +1,7 @@
+project = libtss2-tcti-swtpm
+
+using version
+using config
+using test
+using install
+using dist

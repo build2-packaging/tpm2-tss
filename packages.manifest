@@ -15,3 +15,6 @@ location: libtss2-tcti-device/
 
 :
 location: libtss2-tcti-mssim/
+
+:
+location: libtss2-tcti-swtpm/
