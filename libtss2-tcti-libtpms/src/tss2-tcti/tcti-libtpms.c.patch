@@ -1,0 +1,153 @@
+--- tcti-libtpms.c.orig	2026-09-26 17:08:06 +0200
++++ tcti-libtpms.c	2026-09-27 00:29:45 +0200
+@@ -8,7 +8,11 @@
+ #include "config.h" // IWYU pragma: keep
+ #endif
+ 
+-#include <dlfcn.h>             // for dlerror, dlsym, dlclose, dlopen, RTLD...
++#ifndef _WIN32
++#include <dlfcn.h> // for dlerror, dlsym, dlclose, dlopen, RTLD...
++#else
++#include <libtpms/tpm_library.h> // for TPMLIB_ChooseTPMVersion et al., linked directly
++#endif
+ #include <errno.h>             // for errno
+ #include <fcntl.h>             // for open, posix_fallocate, O_CREAT, O_RDWR
+ #include <inttypes.h>          // for uint32_t, PRIx32, PRIu32, PRIxPTR
+@@ -28,11 +32,62 @@
+ #include "tss2_tpm2_types.h"   // for TPM2_RC_SUCCESS
+ #include "util/aux_util.h"     // for MAYBE_UNUSED, ARRAY_LEN
+ 
++#if defined(_MSC_VER)
++#define TSS2_TLS __declspec(thread)
++#else
++#define TSS2_TLS __thread
++#endif
++
+ #define LOGMODULE tcti
+ #include "util/log.h" // for LOG_ERROR, LOG_TRACE, LOG_DEBUG, LOGB...
+ 
+ #if defined(__FreeBSD__)
+ #define mremap(a, b, c, d) ((void *)(-1))
++#elif defined(__APPLE__)
++#define mremap(a, b, c, d) ((void *)(-1))
++#define posix_fallocate(fd, offset, len) (ENOSYS)
++#elif defined(_WIN32)
++#define posix_fallocate(fd, offset, len) (ENOSYS)
++#define open  _open
++#define close _close
++#define lseek _lseek
++/* truncate() itself is declared in compat/unistd.h (only ever reached for
++ * a state file path, which is rejected before this can run, see the conf
++ * handling in Tss2_Tcti_Libtpms_Init() below). */
++
++/* No mmap()/munmap()/mremap() on Windows at all. The only mapping this file
++ * ever creates here is the anonymous (no state file) case, so back it with
++ * plain heap memory instead of porting the state-file persistence to
++ * CreateFileMapping()/MapViewOfFile(). mmap() zero-fills anonymous memory,
++ * which calloc() matches; growing via mremap() preserves existing content
++ * and zero-fills the new tail, which realloc() plus a manual memset() of
++ * the tail matches.
++ */
++#define MAP_FAILED     NULL
++#define PROT_READ      0
++#define PROT_WRITE     0
++#define MAP_PRIVATE    0
++#define MAP_SHARED     0
++#define MAP_ANONYMOUS  0
++#define MREMAP_MAYMOVE 0
++
++static __inline void *
++tcti_libtpms_win_mmap_anon(size_t len) {
++    return calloc(1, len);
++}
++
++static __inline void *
++tcti_libtpms_win_mremap_anon(void *addr, size_t old_len, size_t new_len) {
++    void *p = realloc(addr, new_len);
++    if (p != NULL && new_len > old_len) {
++        memset((unsigned char *)p + old_len, 0, new_len - old_len);
++    }
++    return p;
++}
++
++#define mmap(addr, len, prot, flags, fd, off) tcti_libtpms_win_mmap_anon(len)
++#define mremap(addr, old_len, new_len, flags) tcti_libtpms_win_mremap_anon(addr, old_len, new_len)
++#define munmap(addr, len) free(addr)
+ #endif
+ 
+ /*
+@@ -53,7 +108,7 @@
+     }                                                                                              \
+     current_tcti_libtpms = NULL;
+ 
+-static __thread TSS2_TCTI_LIBTPMS_CONTEXT *current_tcti_libtpms = NULL;
++static TSS2_TLS TSS2_TCTI_LIBTPMS_CONTEXT *current_tcti_libtpms = NULL;
+ 
+ /*
+  * If the mapped memory for the state file does not suffice, reallocate. This
+@@ -314,8 +369,11 @@
+ 
+     tcti_libtpms->TPMLIB_Terminate();
+ 
+-    /* close libtpms library handle */
++#ifndef _WIN32
++    /* close libtpms library handle (statically linked on Windows, nothing
++     * to close) */
+     dlclose(tcti_libtpms->libtpms);
++#endif
+ 
+     if (tcti_libtpms->state_mmap != NULL) {
+         /* unmap memory (may be backed by a state file) */
+@@ -410,6 +468,19 @@
+ 
+ TSS2_RC
+ tcti_libtpms_dl(TSS2_TCTI_LIBTPMS_CONTEXT *tcti_libtpms) {
++#ifdef _WIN32
++    /* libtpms is always linked directly here (see buildfile), so just wire
++     * up the function pointers to the real, statically-linked functions
++     * instead of dlopen()/dlsym()'ing a shared library by name.
++     */
++    tcti_libtpms->TPMLIB_ChooseTPMVersion = TPMLIB_ChooseTPMVersion;
++    tcti_libtpms->TPMLIB_RegisterCallbacks = TPMLIB_RegisterCallbacks;
++    tcti_libtpms->TPMLIB_MainInit = TPMLIB_MainInit;
++    tcti_libtpms->TPMLIB_Process = TPMLIB_Process;
++    tcti_libtpms->TPMLIB_Terminate = TPMLIB_Terminate;
++
++    return TPM2_RC_SUCCESS;
++#else
+     const char *names[] = { "libtpms.so", "libtpms.so.0" };
+ 
+     for (size_t i = 0; i < ARRAY_LEN(names); i++) {
+@@ -459,6 +530,7 @@
+ cleanup_dl:
+     dlclose(tcti_libtpms->libtpms);
+     return TSS2_TCTI_RC_GENERAL_FAILURE;
++#endif
+ }
+ 
+ /****************** libtpms callbacks ******************
+@@ -889,10 +961,11 @@
+     if (conf == NULL || strlen(conf) == 0) {
+         tcti_libtpms->state_path = NULL;
+     } else {
+-#ifdef __FreeBSD__
+-        // mremap() on FreeBSD is a stub returning -1/ENOMEM
++#if defined(__FreeBSD__) || defined(__APPLE__) || defined(_WIN32)
++        // mremap()/posix_fallocate() are stubbed out on FreeBSD/macOS, and
++        // Windows has no mmap()/mremap() at all (see the top-of-file stubs)
+         // this could be fixed with a munmap()/mmap() workaround
+-        LOG_ERROR("Libtpms state files are not supported on FreeBSD. Try an empty conf string.");
++        LOG_ERROR("Libtpms state files are not supported on FreeBSD, macOS, or Windows. Try an empty conf string.");
+         return TSS2_TCTI_RC_BAD_VALUE;
+ #else
+         tcti_libtpms->state_path = strdup(conf);
+@@ -938,7 +1011,9 @@
+     free(tcti_libtpms->state_path);
+ 
+ cleanup_dl:
++#ifndef _WIN32
+     dlclose(tcti_libtpms->libtpms);
++#endif
+ 
+     return rc;
+ }
