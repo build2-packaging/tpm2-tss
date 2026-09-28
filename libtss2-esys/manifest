@@ -25,4 +25,5 @@ builds: -( +windows &static ) ; Static variant of Tbs.lib is not available.
 build-include: linux**
 build-include: freebsd**
 build-include: macos**
-build-exclude: ** ; Only Linux, FreeBSD, and macOS are supported.
+build-include: windows**
+build-exclude: ** ; Only Linux, FreeBSD, macOS, and Windows are supported.
