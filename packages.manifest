@@ -6,3 +6,6 @@ location: libtss2-mu/
 
 :
 location: libtss2-rc/
+
+:
+location: libtss2-sys/

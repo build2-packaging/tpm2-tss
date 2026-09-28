@@ -1,0 +1,7 @@
+project = libtss2-sys
+
+using version
+using config
+using test
+using install
+using dist
