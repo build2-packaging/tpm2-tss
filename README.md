@@ -16,6 +16,7 @@ appropriate for development rather than consumption. If you want to use
 * [`libtss2-tcti-device`](libtss2-tcti-device/PACKAGE-README.md)
 * [`libtss2-tcti-libtpms`](libtss2-tcti-libtpms/PACKAGE-README.md)
 * [`libtss2-tcti-mssim`](libtss2-tcti-mssim/PACKAGE-README.md)
+* [`libtss2-tcti-null`](libtss2-tcti-null/PACKAGE-README.md)
 * [`libtss2-tcti-pcap`](libtss2-tcti-pcap/PACKAGE-README.md)
 * [`libtss2-tcti-swtpm`](libtss2-tcti-swtpm/PACKAGE-README.md)
 * [`libtss2-tcti-tbs`](libtss2-tcti-tbs/PACKAGE-README.md)
