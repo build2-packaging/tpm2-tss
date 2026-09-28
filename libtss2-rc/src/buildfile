@@ -1,6 +1,7 @@
 intf_libs = # Interface dependencies.
 impl_libs = # Implementation dependencies.
-#import xxxx_libs += libhello%lib{hello}
+
+import intf_libs += libtss2-headers%lib{tss2-headers}
 
 # Public headers.
 #
@@ -21,33 +22,68 @@ def{tss2-rc}: libul{tss2-rc}
 
 # Build options.
 #
+# The sources include the public headers with unqualified names, so the
+# tss2/ directory is also on the private header search path.
+#
 out_pfx_inc = [dir_path] $out_root/include/
 src_pfx_inc = [dir_path] $src_root/include/
+out_pfx_unq = [dir_path] $out_root/include/tss2/
+src_pfx_unq = [dir_path] $src_root/include/tss2/
 out_pfx_src = [dir_path] $out_root/src/
 src_pfx_src = [dir_path] $src_root/src/
 
 c.poptions =+ "-I$out_pfx_src" "-I$src_pfx_src" \
-              "-I$out_pfx_inc" "-I$src_pfx_inc"
+              "-I$out_pfx_inc" "-I$src_pfx_inc" \
+              "-I$out_pfx_unq" "-I$src_pfx_unq"
+
+# The upstream sources pass no variadic arguments to a variadic macro, which
+# Clang only diagnoses in pedantic mode.
+#
+if ($c.id.type == 'clang')
+  c.coptions += -Wno-gnu-zero-variadic-macro-arguments
 
 if ($c.target.system == 'mingw32')
   c.loptions += -Wl,--export-all-symbols
 
 # Export options.
 #
+# The public headers include each other with unqualified names, so consumers
+# also need the tss2/ directory on their header search path.
+#
 lib{tss2-rc}:
 {
-  c.export.poptions = "-I$out_pfx_inc" "-I$src_pfx_inc"
+  c.export.poptions = "-I$out_pfx_inc" "-I$src_pfx_inc" \
+                      "-I$out_pfx_unq" "-I$src_pfx_unq"
   c.export.libs = $intf_libs
 }
+
+lib{tss2-rc}: c.pkgconfig.include = include/ include/tss2/
+
+# Only export the public API from the shared library on ELF targets.
+#
+lib{tss2-rc}: file{tss2-rc.map}: include = adhoc
+
+if ($c.target.class == 'linux' || $c.target.class == 'bsd')
+  libs{tss2-rc}: c.loptions += "-Wl,--version-script=$src_base/tss2-rc.map"
 
 # For pre-releases use the complete version to make sure they cannot
 # be used in place of another pre-release or the final version. See
 # the version module for details on the version.* variable values.
 #
+# A final release uses the same shared library names as upstream (libtool
+# version-info 0:0:0): libtss2-rc.so.0.0.0 with SONAME libtss2-rc.so.0 on
+# Linux, libtss2-rc.so.0 on BSD, and libtss2-rc.0.dylib on macOS. linux@
+# needs MAJOR.MINOR[.EXTRA], macos@ and bsd@ are not implemented, so the
+# BSD name is set through the extension.
+#
 if $version.pre_release
   lib{tss2-rc}: bin.lib.version = "-$version.project_id"
+elif ($c.target.class == 'macos')
+  lib{tss2-rc}: bin.lib.version = ".0"
+elif ($c.target.class == 'bsd')
+  libs{tss2-rc}: extension = "so.0"
 else
-  lib{tss2-rc}: bin.lib.version = "-$version.major.$version.minor"
+  lib{tss2-rc}: bin.lib.version = "-0" linux@"0.0.0"
 
 # Don't install private headers.
 #
