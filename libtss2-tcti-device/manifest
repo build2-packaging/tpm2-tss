@@ -1,16 +1,24 @@
 : 1
 name: libtss2-tcti-device
-version: 0.1.0-a.0.z
+version: 4.2.0-a.0.z
 language: c
-project: build2-tpm2-tss
-summary: tss2-tcti-device C library
+project: tpm2-tss
+summary: TPM2 software stack device TCTI C library
+topics: tpm, tpm2, tss, security, c
 license: BSD-2-Clause ; BSD 2-Clause "Simplified" License.
 description-file: README.md
 package-description-file: PACKAGE-README.md
 changes-file: CHANGELOG.md
-url: https://example.org/upstream
-email: upstream@example.org
-package-url: https://github.com/build2-packaging/build2-tpm2-tss
+url: https://github.com/tpm2-software/tpm2-tss
+doc-url: https://tpm2-tss.readthedocs.io
+src-url: https://github.com/tpm2-software/tpm2-tss
+package-url: https://github.com/build2-packaging/tpm2-tss
 package-email: packaging@build2.org ; Mailing list.
 depends: * build2 >= 0.18.0
 depends: * bpkg >= 0.18.0
+depends: libtss2-headers == $
+depends: libtss2-mu == $
+build-include: linux**
+build-include: freebsd**
+build-include: macos**
+build-exclude: ** ; Only Linux, FreeBSD, and macOS are supported.
