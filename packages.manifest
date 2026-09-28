@@ -12,3 +12,6 @@ location: libtss2-sys/
 
 :
 location: libtss2-tcti-device/
+
+:
+location: libtss2-tcti-mssim/
