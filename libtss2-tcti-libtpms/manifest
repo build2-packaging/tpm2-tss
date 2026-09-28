@@ -18,7 +18,7 @@ depends: * build2 >= 0.18.0
 depends: * bpkg >= 0.18.0
 depends: libtss2-headers == $
 depends: libtss2-mu == $
-depends: libtpms >= 0.10.2
+depends: libtpms >= 0.10.2- ; libtpms is still pre-release.
 build-include: linux**
 build-include: freebsd**
 build-include: macos**
