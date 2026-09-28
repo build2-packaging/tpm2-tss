@@ -30,3 +30,8 @@
 # Compilation database.
 #
 compile_commands.json
+
+# Man pages, generated at build time and backlinked into man/ by a
+# forwarded configuration (see man/buildfile), not real tracked content.
+#
+*.7
