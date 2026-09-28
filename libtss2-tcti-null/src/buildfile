@@ -1,6 +1,9 @@
 intf_libs = # Interface dependencies.
 impl_libs = # Implementation dependencies.
-#import xxxx_libs += libhello%lib{hello}
+
+import intf_libs += libtss2-headers%lib{tss2-headers}
+import impl_libs += libtss2-mu%lib{tss2-mu}
+import impl_libs += libtss2-tctildr%lib{tss2-tctildr}
 
 # Public headers.
 #
@@ -21,33 +24,93 @@ def{tss2-tcti-null}: libul{tss2-tcti-null}
 
 # Build options.
 #
+# The sources include the public headers with unqualified names, so the
+# tss2/ directory is also on the private header search path.
+#
 out_pfx_inc = [dir_path] $out_root/include/
 src_pfx_inc = [dir_path] $src_root/include/
+out_pfx_unq = [dir_path] $out_root/include/tss2/
+src_pfx_unq = [dir_path] $src_root/include/tss2/
 out_pfx_src = [dir_path] $out_root/src/
 src_pfx_src = [dir_path] $src_root/src/
 
 c.poptions =+ "-I$out_pfx_src" "-I$src_pfx_src" \
-              "-I$out_pfx_inc" "-I$src_pfx_inc"
+              "-I$out_pfx_inc" "-I$src_pfx_inc" \
+              "-I$out_pfx_unq" "-I$src_pfx_unq"
+
+# Matches upstream's own default (autotools --enable-log-file): lets
+# TSS2_LOGFILE redirect log output to a file at runtime. Does not
+# enable logging itself (see log.c's LOGDEFAULT, warning level).
+#
+c.poptions += -DLOG_FILE_ENABLED
+
+# util-io/io.c (pulled in by the wildcard below, even though tcti-null.c
+# itself does no socket I/O) needs Winsock on Windows.
+#
+if ($c.target.class == 'windows')
+{
+  if ($c.target.system == 'mingw32')
+    c.libs += -lws2_32
+  else
+    c.libs += Ws2_32.lib
+}
+
+# The upstream logging macros are invoked without variadic arguments, which
+# Clang only diagnoses in pedantic mode.
+#
+if ($c.id.type == 'clang')
+  c.coptions += -Wno-variadic-macro-arguments-omitted \
+                -Wno-unknown-warning-option
+
+# The Microsoft UCRT (targeted by both MSVC and Clang in MSVC mode) has no
+# POSIX strtok_r(); its strtok_s() is a drop-in replacement (identical
+# signature and semantics). MinGW's own CRT already provides strtok_r().
+#
+if ($c.target.system == 'win32-msvc')
+  util/obj{key-value-parse}: c.poptions += -Dstrtok_r=strtok_s
 
 if ($c.target.system == 'mingw32')
   c.loptions += -Wl,--export-all-symbols
 
 # Export options.
 #
+# The public headers include each other with unqualified names, so consumers
+# also need the tss2/ directory on their header search path.
+#
 lib{tss2-tcti-null}:
 {
-  c.export.poptions = "-I$out_pfx_inc" "-I$src_pfx_inc"
+  c.export.poptions = "-I$out_pfx_inc" "-I$src_pfx_inc" \
+                      "-I$out_pfx_unq" "-I$src_pfx_unq"
   c.export.libs = $intf_libs
 }
+
+lib{tss2-tcti-null}: c.pkgconfig.include = include/ include/tss2/
+
+# Only export the public API from the shared library on ELF targets.
+#
+lib{tss2-tcti-null}: file{tss2-tcti-null.map}: include = adhoc
+
+if ($c.target.class == 'linux' || $c.target.class == 'bsd')
+  libs{tss2-tcti-null}: c.loptions += "-Wl,--version-script=$src_base/tss2-tcti-null.map"
 
 # For pre-releases use the complete version to make sure they cannot
 # be used in place of another pre-release or the final version. See
 # the version module for details on the version.* variable values.
 #
+# A final release uses the same shared library names as upstream (libtool
+# version-info 0:0:0): libtss2-tcti-null.so.0.0.0 with SONAME libtss2-tcti-null.so.0 on
+# Linux, libtss2-tcti-null.so.0 on BSD, and libtss2-tcti-null.0.dylib on macOS. linux@
+# needs MAJOR.MINOR[.EXTRA], macos@ and bsd@ are not implemented, so the
+# BSD name is set through the extension.
+#
 if $version.pre_release
   lib{tss2-tcti-null}: bin.lib.version = "-$version.project_id"
+elif ($c.target.class == 'macos')
+  lib{tss2-tcti-null}: bin.lib.version = ".0"
+elif ($c.target.class == 'bsd')
+  libs{tss2-tcti-null}: extension = "so.0"
 else
-  lib{tss2-tcti-null}: bin.lib.version = "-$version.major.$version.minor"
+  lib{tss2-tcti-null}: bin.lib.version = "-0" linux@"0.0.0"
 
 # Don't install private headers.
 #
