@@ -10,3 +10,12 @@ exe{*}: test = true
 # The test target for cross-testing (running tests under Wine, etc).
 #
 test.target = $c.target
+
+# tests/src/{util,tss2-sys,tss2-tcti}/ compile internal (non-exported)
+# library sources directly (see tests/unit/buildfile for which test needs
+# which file) and need the same private -I search paths as their
+# tests/unit/ callers.
+#
+c.poptions =+ "-I$src_root/../src/" \
+              "-I$src_root/../src/tss2-sys/" \
+              "-I$src_root/../src/util/"

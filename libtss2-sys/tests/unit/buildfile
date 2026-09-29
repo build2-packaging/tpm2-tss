@@ -1,0 +1,51 @@
+import libs = libtss2-sys%lib{tss2-sys} libtss2-mu%lib{tss2-mu}
+
+# See libtss2-mu/tests/unit/buildfile for why this is needed: a symlinked
+# test's own quoted "../helper/cmocka_all.h" resolves differently across
+# toolchains, but both possible targets wrap the same angle-bracket
+# <cmocka.h>, reached via this -I regardless of which one gets picked.
+#
+c.poptions =+ "-I$src_base/../helper/"
+
+./: ../helper/h{cmocka cmocka_all}
+
+# CommonPreparePrologue.c and CopyCommandHeader.c test CommonPreparePrologue()
+# and CopyCommandHeader(), internal (non-exported) tss2-sys functions, so
+# they compile sysapi_util.c directly rather than linking the installed
+# library for them. Its own #include "sysapi_util.h" has no subdirectory
+# prefix, hence -I pointing directly at tss2-sys/.
+#
+c.poptions =+ "-I$src_root/../src/tss2-sys/"
+
+# sys-execute.c similarly needs the internal tcti-common.c (for
+# header_unmarshal()) and util/log.c (for the LOG_* macros tcti-common.c
+# uses), both included with a subdirectory prefix ("tss2-tcti/tcti-common.h",
+# "util/log.h"). tcti-common.c/h live under tests/src/ (not part of the
+# library), hence the extra -I.
+#
+c.poptions =+ "-I$src_root/../src/" "-I$src_base/../src/"
+
+./: exe{CommonPreparePrologue}: c{CommonPreparePrologue} \
+  ../src/tss2-sys/c{sysapi_util} $libs
+
+./: exe{CopyCommandHeader}: c{CopyCommandHeader} \
+  ../src/tss2-sys/c{sysapi_util} $libs
+
+# CopyCommandHeader.c uses glibc's <netinet/in.h> (htonl/htons) directly,
+# which no Windows toolchain here provides; compat/netinet_in stands in
+# for it (same pattern as libtss2-tcti-libtpms's own compat/netinet_in).
+#
+exe{CopyCommandHeader}: compat/netinet_in/netinet/h{in}
+
+if ($c.target.class == 'windows')
+{
+  obj{CopyCommandHeader}: c.poptions += "-I$src_base/compat/netinet_in"
+
+  if ($c.target.system == 'mingw32')
+    exe{CopyCommandHeader}: c.libs += -lws2_32
+  else
+    exe{CopyCommandHeader}: c.libs += Ws2_32.lib
+}
+
+./: exe{sys-execute}: c{sys-execute} \
+  ../src/tss2-tcti/c{tcti-common} ../src/util/c{log} $libs
