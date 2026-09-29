@@ -1,0 +1,10 @@
+./: tss2-esys/ tss2-tcti/ util/
+
+# Matches libtss2-esys's own src/buildfile.
+#
+if ($c.id.type == 'msvc')
+{
+  tss2-esys/obj{esys_iutil}:       c.coptions += /wd4267
+  tss2-esys/obj{esys_crypto}:      c.coptions += /wd4267
+  tss2-esys/obj{esys_crypto_ossl}: c.coptions += /wd4267
+}

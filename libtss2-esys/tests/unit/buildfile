@@ -1,0 +1,84 @@
+import libs = libtss2-esys%lib{tss2-esys}
+
+# See libtss2-mu/tests/unit/buildfile for why this is needed: a symlinked
+# test's own quoted "../helper/cmocka_all.h" resolves differently across
+# toolchains, but both possible targets wrap the same angle-bracket
+# <cmocka.h>, reached via this -I regardless of which one gets picked.
+#
+c.poptions =+ "-I$src_base/../helper/"
+
+./: ../helper/h{cmocka cmocka_all}
+
+# Private ESYS headers these tests need beyond the public API:
+# esys_int.h/esys_types.h/esys_crypto.h (bare, hence -I directly at
+# tss2-esys/) and tss2-esys/esys_iutil.h, tss2-tcti/tcti-common.h,
+# util/log.h, util/aux_util.h, util/tpm2b.h (each with a subdirectory
+# prefix, hence -I at src/ itself). tcti-common.c/h live under
+# tests/src/ (not part of the library), hence the extra -I.
+#
+c.poptions =+ "-I$src_root/../src/tss2-esys/" \
+              "-I$src_root/../src/" "-I$src_base/../src/"
+
+# Matches this package's own src/buildfile: esys_crypto_ossl.c and
+# tcti-common.c (via its Tss2_MU_* calls, see below) are compiled under
+# the same OpenSSL feature defines the library itself uses.
+#
+c.poptions += -DOSSL -DHAVE_EVP_SM3 -DHAVE_EVP_SM4_CFB
+
+import mu_libs = libtss2-mu%lib{tss2-mu}
+
+# Public-API-only tests: no internal sources need compiling in.
+#
+./: exe{esys-sequence-finish}: c{esys-sequence-finish} $libs
+
+# esys-getpollhandles.c builds a fake array of TSS2_TCTI_POLL_HANDLE
+# using POSIX struct pollfd's .fd/.events/.revents members; on Windows
+# that type is instead a plain HANDLE (see tss2_tcti.h), so the test
+# itself cannot compile there at all. Excluded from ./: rather than the
+# whole declaration so it still shows up in a source distribution built
+# from any config (see keep-build-graph-config-independent.md).
+#
+./: exe{esys-getpollhandles}: include = ($c.target.class != 'windows')
+exe{esys-getpollhandles}: c{esys-getpollhandles} $libs
+
+# ac-getcapability/ac-send/policy-ac-sendselect's fake TCTI transmit
+# callbacks call header_unmarshal() from tcti-common.c directly (upstream
+# gets this for free since its Autotools build links every test against
+# every library it builds, several of which already happen to compile
+# tcti-common.c in; this repo's packages are independent, so it has to be
+# compiled in explicitly instead). tcti-common.c itself calls Tss2_MU_*
+# functions, hence $mu_libs.
+#
+./: exe{esys-ac-getcapability}: c{esys-ac-getcapability} \
+  ../src/tss2-tcti/c{tcti-common} ../src/util/c{log} $libs $mu_libs
+./: exe{esys-ac-send}: c{esys-ac-send} \
+  ../src/tss2-tcti/c{tcti-common} ../src/util/c{log} $libs $mu_libs
+./: exe{esys-policy-ac-sendselect}: c{esys-policy-ac-sendselect} \
+  ../src/tss2-tcti/c{tcti-common} ../src/util/c{log} $libs $mu_libs
+
+# These test internal ESYS resource/crypto-callback handling, so they
+# compile esys_iutil.c/esys_crypto.c/esys_crypto_ossl.c (this package's
+# own OpenSSL crypto backend) directly, matching upstream's own
+# Makefile-test.am, and need libcrypto and libtss2-mu directly (not just
+# transitively via lib{tss2-esys}), since both are called from those
+# internal sources directly.
+#
+import crypto_libs = libcrypto%lib{crypto}
+
+./: exe{esys-resubmissions}: c{esys-resubmissions} h{esys-dummy-defs} \
+  ../src/tss2-esys/c{esys_iutil esys_crypto esys_crypto_ossl} \
+  $libs $crypto_libs $mu_libs
+
+./: exe{esys-tcti-rcs}: c{esys-tcti-rcs} h{esys-dummy-defs} \
+  ../src/tss2-esys/c{esys_iutil esys_crypto esys_crypto_ossl} \
+  $libs $crypto_libs $mu_libs
+
+./: exe{esys-tpm-rcs}: c{esys-tpm-rcs} h{esys-dummy-defs} \
+  ../src/tss2-esys/c{esys_iutil esys_crypto esys_crypto_ossl} \
+  $libs $crypto_libs $mu_libs
+
+import tctildr_libs = libtss2-tctildr%lib{tss2-tctildr}
+
+./: exe{esys-crypto}: c{esys-crypto} \
+  ../src/tss2-esys/c{esys_context esys_iutil esys_crypto esys_crypto_ossl} \
+  $libs $crypto_libs $mu_libs $tctildr_libs

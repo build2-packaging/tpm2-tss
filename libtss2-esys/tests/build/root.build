@@ -10,3 +10,13 @@ exe{*}: test = true
 # The test target for cross-testing (running tests under Wine, etc).
 #
 test.target = $c.target
+
+# tests/src/{tss2-esys,tss2-tcti,util}/ compile internal (non-exported)
+# library sources directly (see tests/unit/buildfile for which test needs
+# which file) and need the same private -I search paths (and the same
+# OpenSSL defines the library itself uses) as their tests/unit/ callers.
+#
+c.poptions =+ "-I$src_root/../src/tss2-esys/" \
+              "-I$src_root/../src/" \
+              "-I$src_root/../src/util/" \
+              -DOSSL -DHAVE_EVP_SM3 -DHAVE_EVP_SM4_CFB

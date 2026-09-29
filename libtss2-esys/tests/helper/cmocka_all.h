@@ -1,0 +1,1 @@
+../../../libtss2-mu/tests/helper/cmocka_all.h
