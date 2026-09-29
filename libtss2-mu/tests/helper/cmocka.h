@@ -38,6 +38,8 @@ struct CMUnitTest
 #define assert_int_equal(a, b)       assert((a) == (b))
 #define assert_null(p)               assert((p) == NULL)
 #define assert_non_null(p)           assert((p) != NULL)
+#define assert_ptr_equal(a, b)       assert((a) == (b))
+#define assert_ptr_not_equal(a, b)   assert((a) != (b))
 #define assert_memory_equal(a, b, n) assert(memcmp((a), (b), (n)) == 0)
 #define assert_string_equal(a, b)    assert(strcmp((a), (b)) == 0)
 
