@@ -1,0 +1,47 @@
+import libs = libtss2-mu%lib{tss2-mu}
+
+# Each test's own "../helper/cmocka_all.h" is a quoted, relative include.
+# Toolchains differ on whether that resolves against a symlinked source
+# file's own logical location (finding tests/helper/cmocka_all.h, our
+# stand-in) or against its upstream/ submodule symlink target (finding
+# upstream's real test/helper/cmocka_all.h instead). Both wrap the same
+# angle-bracket <cmocka.h>, so adding this -I makes either choice resolve
+# to our stand-in regardless of which one a given toolchain picks.
+#
+c.poptions =+ "-I$src_base/../helper/"
+
+./: ../helper/h{cmocka cmocka_all}
+
+# These upstream tests use the private util/tss2_endian.h header (for
+# HOST_TO_BE_* byte-order helpers), which is not part of the public,
+# exported API and so is not on the search path libtss2-mu%lib{tss2-mu}
+# exports to consumers.
+#
+c.poptions =+ "-I$src_root/../src/"
+
+./: exe{UINT8-marshal}:  c{UINT8-marshal}  $libs
+./: exe{UINT16-marshal}: c{UINT16-marshal} $libs
+./: exe{UINT32-marshal}: c{UINT32-marshal} $libs
+./: exe{UINT64-marshal}: c{UINT64-marshal} $libs
+
+# TPM2B-marshal.c uses a C99 VLA, which MSVC's own compiler has never
+# implemented (unlike Clang, even in MSVC-compatibility mode, and GCC), and
+# glibc's <endian.h> (le32toh/le64toh) directly, which neither Windows nor
+# macOS provides (compat/endian.h stands in for it, a no-op on both since
+# neither has a big-endian target). The VLA use is excluded from ./:
+# rather than the whole declaration, and the compat header is an
+# unconditional prerequisite, so both still show up in a source
+# distribution built from any config (see
+# keep-build-graph-config-independent.md).
+#
+./: exe{TPM2B-marshal}: include = ($c.id.type != 'msvc')
+exe{TPM2B-marshal}: c{TPM2B-marshal} $libs compat/h{endian}
+
+if ($c.target.class == 'windows' || $c.target.class == 'macos')
+  obj{TPM2B-marshal}: c.poptions += "-I$src_base/compat/"
+
+./: exe{TPMA-marshal}:   c{TPMA-marshal}   $libs
+./: exe{TPML-marshal}:   c{TPML-marshal}   $libs
+./: exe{TPMS-marshal}:   c{TPMS-marshal}   $libs
+./: exe{TPMT-marshal}:   c{TPMT-marshal}   $libs
+./: exe{TPMU-marshal}:   c{TPMU-marshal}   $libs
