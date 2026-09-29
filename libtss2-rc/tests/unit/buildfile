@@ -1,0 +1,17 @@
+import libs = libtss2-rc%lib{tss2-rc}
+
+# See libtss2-mu/tests/unit/buildfile for why this is needed: a symlinked
+# test's own quoted "../helper/cmocka_all.h" resolves differently across
+# toolchains, but both possible targets wrap the same angle-bracket
+# <cmocka.h>, reached via this -I regardless of which one gets picked.
+#
+c.poptions =+ "-I$src_base/../helper/"
+
+./: ../helper/h{cmocka cmocka_all}
+
+# For util/aux_util.h (ARRAY_LEN/UNUSED macros), a private header not part
+# of the public API libtss2-rc%lib{tss2-rc} exports to consumers.
+#
+c.poptions =+ "-I$src_root/../src/"
+
+./: exe{test_tss2_rc}: c{test_tss2_rc} $libs
