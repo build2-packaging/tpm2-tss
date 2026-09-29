@@ -16,7 +16,7 @@ lib{tss2-sys}: libul{tss2-sys}: $pub/{$pub_hdrs}
 
 # Private headers and sources as well as dependencies.
 #
-libul{tss2-sys}: {h c}{** -util/key-value-parse} $impl_libs $intf_libs
+libul{tss2-sys}: {h c}{** -util/key-value-parse -tss2-tcti/**} $impl_libs $intf_libs
 
 libs{tss2-sys}: def{tss2-sys}: include = ($c.target.system == 'win32-msvc')
 def{tss2-sys}: libul{tss2-sys}
