@@ -18,6 +18,6 @@ depends: * build2 >= 0.18.0
 depends: * bpkg >= 0.18.0
 depends: libtss2-headers == $
 depends: libtss2-mu == $
-builds: -static ; Tbs.lib has no static archive form on Windows.
+builds: -static ; Static variant of Tbs.lib is not available.
 build-include: windows**
 build-exclude: ** ; Only Windows is supported.
